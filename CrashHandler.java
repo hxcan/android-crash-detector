@@ -23,10 +23,11 @@ import java.util.Locale;
 public class CrashHandler implements Thread.UncaughtExceptionHandler {
     
     private static final String TAG = "CrashDetector";
-    private static final String CRASH_LOG_DIR = "/sdcard/Download/crashes/";
+    private static final String CRASH_LOG_BASE_DIR = "/sdcard/Download/crashes/";
     
     private final Context context;
     private final Thread.UncaughtExceptionHandler defaultHandler;
+    private final String packageName;
     
     /**
      * 构造函数
@@ -34,6 +35,7 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
      */
     public CrashHandler(Context context) {
         this.context = context.getApplicationContext();
+        this.packageName = context.getPackageName();
         this.defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
     }
     
@@ -46,14 +48,25 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
     public static void init(Context context) {
         CrashHandler handler = new CrashHandler(context);
         Thread.setDefaultUncaughtExceptionHandler(handler);
-        Log.i(TAG, "✅ Android Crash Detector 已初始化");
+        Log.i(TAG, "✅ Android Crash Detector 已初始化 (包名：" + context.getPackageName() + ")");
         
-        // 确保日志目录存在
-        File logDir = new File(CRASH_LOG_DIR);
-        if (!logDir.exists()) {
-            boolean created = logDir.mkdirs();
-            Log.i(TAG, "创建日志目录：" + (created ? "成功" : "失败"));
+        // 确保日志目录存在（按包名创建子目录）
+        String logDir = getLogDir(context.getPackageName());
+        File dir = new File(logDir);
+        if (!dir.exists()) {
+            boolean created = dir.mkdirs();
+            Log.i(TAG, "创建日志目录：" + logDir + (created ? " 成功" : " 失败"));
         }
+    }
+    
+    /**
+     * 获取指定包名的日志目录路径
+     * 
+     * @param packageName 应用包名
+     * @return 日志目录完整路径
+     */
+    private static String getLogDir(String packageName) {
+        return CRASH_LOG_BASE_DIR + packageName + "/";
     }
     
     @Override
@@ -115,9 +128,9 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
         
         // 应用信息
         report.append("\n【应用信息】\n");
-        report.append("包名：").append(context.getPackageName()).append("\n");
+        report.append("包名：").append(packageName).append("\n");
         try {
-            PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            PackageInfo packageInfo = context.getPackageManager().getPackageInfo(packageName, 0);
             report.append("版本名：").append(packageInfo.versionName).append("\n");
             report.append("版本码：").append(packageInfo.versionCode).append("\n");
         } catch (Exception e) {
@@ -131,14 +144,18 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
     
     /**
      * 保存崩溃日志到外置存储
+     * 日志文件路径：/sdcard/Download/crashes/{packageName}/crash_{packageName}_{timestamp}.log
      * 
      * @param crashReport 崩溃报告内容
      */
     private void saveCrashLog(String crashReport) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA);
         String timestamp = sdf.format(new Date());
-        String fileName = "crash_" + timestamp + ".log";
-        File logFile = new File(CRASH_LOG_DIR + fileName);
+        
+        // 文件名格式：crash_{包名}_{时间戳}.log
+        String fileName = "crash_" + packageName + "_" + timestamp + ".log";
+        String logDir = getLogDir(packageName);
+        File logFile = new File(logDir + fileName);
         
         try (FileWriter writer = new FileWriter(logFile)) {
             writer.write(crashReport);
