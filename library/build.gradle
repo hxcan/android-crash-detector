@@ -1,5 +1,4 @@
 apply plugin: 'com.android.library'
-apply plugin: 'maven-publish'
 
 android {
     namespace 'com.stupidbeauty.crashdetector'
@@ -27,18 +26,4 @@ android {
 
 dependencies {
     implementation 'androidx.annotation:annotation:1.7.1'
-}
-
-// Publishing configuration for JitPack
-afterEvaluate {
-    publishing {
-        publications {
-            release(MavenPublication) {
-                from components.android
-                groupId = 'com.github.hxcan'
-                artifactId = 'android-crash-detector'
-                version = '2026.4.4'
-            }
-        }
-    }
 }
