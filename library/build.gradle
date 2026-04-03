@@ -1,3 +1,49 @@
 apply plugin: 'com.android.library'
-apply plugin: 'maven-publish'\n\nandroid {\n    namespace 'com.stupidbeauty.crashdetector'\n    compileSdk 34\n\n    defaultConfig {\n        minSdk 21\n        targetSdk 34\n        versionCode 1\n        versionName \"1.0.0\"\n    }\n\n    buildTypes {\n        release {\n            minifyEnabled false\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\n        }\n    }\n\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_1_8\n        targetCompatibility JavaVersion.VERSION_1_8\n    }\n}\n\ndependencies {\n    implementation 'androidx.annotation:annotation:1.7.1'\n}\n\n// Publishing configuration for JitPack
-afterEvaluate {\n    publishing {\n        publications {\n            release(MavenPublication) {\n                from components.release\n                groupId = 'com.github.hxcan'\n                artifactId = 'android-crash-detector'\n                version = '2026.4.4'\n            }\n        }\n    }\n}
+apply plugin: 'maven-publish'
+
+android {
+    namespace 'com.stupidbeauty.crashdetector'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    publishing {
+        singleVariant('release') {
+            withSourcesJar()
+        }
+    }
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = 'com.github.hxcan'
+                artifactId = 'android-crash-detector'
+                version = '2026.4.4'
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.annotation:annotation:1.7.1'
+}
