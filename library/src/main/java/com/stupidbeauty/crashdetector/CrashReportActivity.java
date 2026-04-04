@@ -8,7 +8,9 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -47,9 +49,9 @@ public class CrashReportActivity extends Activity {
     private void createUI() {
         // 主布局
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setLayoutParams(new ScrollView.LayoutParams(
-            ScrollView.LayoutParams.MATCH_PARENT,
-            ScrollView.LayoutParams.MATCH_PARENT));
+        scrollView.setLayoutParams(new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT));
         
         TextView titleView = new TextView(this);
         titleView.setText("💥 应用崩溃报告");
@@ -65,26 +67,26 @@ public class CrashReportActivity extends Activity {
         crashTextView.setTypeface(android.graphics.Typeface.MONOSPACE);
         crashTextView.setTextIsSelectable(true);
         
-        // 按钮布局
+        // 按钮布局 - 使用 LinearLayout.LayoutParams
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT);
+        
         Button copyBtn = new Button(this);
         copyBtn.setText("📋 复制到剪贴板");
-        copyBtn.setLayoutParams(new Button.LayoutParams(
-            Button.LayoutParams.MATCH_PARENT,
-            Button.LayoutParams.WRAP_CONTENT));
+        copyBtn.setLayoutParams(buttonParams);
         copyBtn.setPadding(32, 24, 32, 24);
         copyBtn.setOnClickListener(v -> copyToClipboard());
         
         Button shareBtn = new Button(this);
         shareBtn.setText("📤 分享崩溃报告");
-        shareBtn.setLayoutParams(new Button.LayoutParams(
-            Button.LayoutParams.MATCH_PARENT,
-            Button.LayoutParams.WRAP_CONTENT));
+        shareBtn.setLayoutParams(buttonParams);
         shareBtn.setPadding(32, 24, 32, 24);
         shareBtn.setOnClickListener(v -> shareCrashReport());
         
         // 添加到滚动视图
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
         layout.addView(titleView);
         layout.addView(crashTextView);
         layout.addView(copyBtn);
