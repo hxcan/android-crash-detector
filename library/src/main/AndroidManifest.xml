@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.stupidbeauty.crashdetector">
 
-    <!-- 存储权限（仅 Android 9 及以下需要） -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
-        android:maxSdkVersion="28" />
+    <application>
+        <!-- CrashReportActivity - 独立进程运行，即使主应用崩溃也能显示 -->
+        <activity
+            android:name=".CrashReportActivity"
+            android:process=":crash"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
+    </application>
 
 </manifest>
