@@ -3,6 +3,7 @@ package com.stupidbeauty.crashdetector;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.os.Build;
+import android.os.Environment;
 import android.util.Log;
 
 import java.io.File;
@@ -14,16 +15,19 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * 全局崩溃处理器
- * 捕获未处理的异常，将崩溃信息输出到外置存储
+ * 全局崩溃处理器（增强版）
+ * 捕获未处理的异常，将崩溃信息保存到：
+ * 1. 应用私有目录（不需要权限，始终可用）
+ * 2. 外置存储（如果权限允许）
+ * 3. 启动 CrashReportActivity 显示崩溃信息（独立进程）
  * 
  * @author 蔡火胜 (hxcan)
- * @version 1.0.0
+ * @version 2.0.0
  */
 public class CrashHandler implements Thread.UncaughtExceptionHandler {
     
     private static final String TAG = "CrashDetector";
-    private static final String CRASH_LOG_BASE_DIR = "/sdcard/Download/crashes/";
+    private static final String EXTERNAL_CRASH_LOG_BASE_DIR = "/sdcard/Download/crashes/";
     
     private final Context context;
     private final Thread.UncaughtExceptionHandler defaultHandler;
@@ -48,25 +52,37 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
     public static void init(Context context) {
         CrashHandler handler = new CrashHandler(context);
         Thread.setDefaultUncaughtExceptionHandler(handler);
-        Log.i(TAG, "✅ Android Crash Detector 已初始化 (包名：" + context.getPackageName() + ")");
+        Log.i(TAG, "✅ Android Crash Detector v2.0.0 已初始化 (包名：" + context.getPackageName() + ")");
         
-        // 确保日志目录存在（按包名创建子目录）
-        String logDir = getLogDir(context.getPackageName());
-        File dir = new File(logDir);
-        if (!dir.exists()) {
-            boolean created = dir.mkdirs();
-            Log.i(TAG, "创建日志目录：" + logDir + (created ? " 成功" : " 失败"));
+        // 确保外置存储日志目录存在
+        String externalLogDir = getExternalLogDir(context.getPackageName());
+        File externalDir = new File(externalLogDir);
+        if (!externalDir.exists()) {
+            boolean created = externalDir.mkdirs();
+            Log.i(TAG, "创建外置日志目录：" + externalLogDir + (created ? " 成功" : " 失败"));
+        }
+        
+        // 确保应用私有日志目录存在
+        String privateLogDir = getPrivateLogDir(context);
+        File privateDir = new File(privateLogDir);
+        if (!privateDir.exists()) {
+            boolean created = privateDir.mkdirs();
+            Log.i(TAG, "创建私有日志目录：" + privateLogDir + (created ? " 成功" : " 失败"));
         }
     }
     
     /**
-     * 获取指定包名的日志目录路径
-     * 
-     * @param packageName 应用包名
-     * @return 日志目录完整路径
+     * 获取外置存储的日志目录路径
      */
-    private static String getLogDir(String packageName) {
-        return CRASH_LOG_BASE_DIR + packageName + "/";
+    private static String getExternalLogDir(String packageName) {
+        return EXTERNAL_CRASH_LOG_BASE_DIR + packageName + "/";
+    }
+    
+    /**
+     * 获取应用私有目录的日志路径
+     */
+    private static String getPrivateLogDir(Context context) {
+        return context.getFilesDir().getAbsolutePath() + "/crashes/";
     }
     
     @Override
@@ -76,21 +92,34 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
         // 生成崩溃报告
         String crashReport = generateCrashReport(thread, throwable);
         
-        // 写入文件
-        saveCrashLog(crashReport);
+        // 1. 写入应用私有目录（不需要权限，始终成功）
+        saveToPrivateStorage(crashReport);
         
-        // 交给默认处理器处理（可选：显示系统崩溃对话框）
+        // 2. 尝试写入外置存储（如果权限允许）
+        saveToExternalStorage(crashReport);
+        
+        // 3. 启动 CrashReportActivity 显示崩溃信息（独立进程）
+        showCrashReportUI(crashReport);
+        
+        // 交给默认处理器处理（显示系统崩溃对话框）
         if (defaultHandler != null) {
-            defaultHandler.uncaughtException(thread, throwable);
+            try {
+                defaultHandler.uncaughtException(thread, throwable);
+            } catch (Exception e) {
+                Log.e(TAG, "默认处理器执行失败：" + e.getMessage());
+            }
+        }
+        
+        // 等待 UI 显示（可选，防止立即退出）
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            Log.e(TAG, "等待中断：" + e.getMessage());
         }
     }
     
     /**
      * 生成崩溃报告
-     * 
-     * @param thread 发生异常的线程
-     * @param throwable 异常对象
-     * @return 格式化的崩溃报告字符串
      */
     private String generateCrashReport(Thread thread, Throwable throwable) {
         StringBuilder report = new StringBuilder();
@@ -143,25 +172,68 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
     }
     
     /**
-     * 保存崩溃日志到外置存储
-     * 日志文件路径：/sdcard/Download/crashes/{packageName}/crash_{packageName}_{timestamp}.log
-     * 
-     * @param crashReport 崩溃报告内容
+     * 保存崩溃日志到应用私有目录（不需要权限）
      */
-    private void saveCrashLog(String crashReport) {
+    private void saveToPrivateStorage(String crashReport) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA);
         String timestamp = sdf.format(new Date());
-        
-        // 文件名格式：crash_{包名}_{时间戳}.log
         String fileName = "crash_" + packageName + "_" + timestamp + ".log";
-        String logDir = getLogDir(packageName);
+        String logDir = getPrivateLogDir(context);
         File logFile = new File(logDir + fileName);
         
         try (FileWriter writer = new FileWriter(logFile)) {
             writer.write(crashReport);
-            Log.i(TAG, "✅ 崩溃日志已保存：" + logFile.getAbsolutePath());
+            Log.i(TAG, "✅ 崩溃日志已保存到私有目录：" + logFile.getAbsolutePath());
         } catch (Exception e) {
-            Log.e(TAG, "❌ 保存崩溃日志失败：" + e.getMessage());
+            Log.e(TAG, "❌ 保存到私有目录失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 保存崩溃日志到外置存储（需要权限检查）
+     */
+    private void saveToExternalStorage(String crashReport) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA);
+        String timestamp = sdf.format(new Date());
+        String fileName = "crash_" + packageName + "_" + timestamp + ".log";
+        String logDir = getExternalLogDir(packageName);
+        File logFile = new File(logDir + fileName);
+        
+        try {
+            // 检查外置存储是否可用
+            if (!Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+                Log.w(TAG, "⚠️ 外置存储不可用，跳过外置存储写入");
+                return;
+            }
+            
+            // 尝试创建目录
+            File dir = new File(logDir);
+            if (!dir.exists()) {
+                if (!dir.mkdirs()) {
+                    Log.w(TAG, "⚠️ 无法创建外置日志目录，可能缺少权限");
+                    return;
+                }
+            }
+            
+            // 写入文件
+            try (FileWriter writer = new FileWriter(logFile)) {
+                writer.write(crashReport);
+                Log.i(TAG, "✅ 崩溃日志已保存到外置存储：" + logFile.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "⚠️ 保存到外置存储失败（可能是权限问题）: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 启动 CrashReportActivity 显示崩溃信息
+     */
+    private void showCrashReportUI(String crashReport) {
+        try {
+            CrashReportActivity.showCrashReport(context, crashReport);
+            Log.i(TAG, "✅ 已启动崩溃报告界面");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ 启动崩溃报告界面失败：" + e.getMessage(), e);
         }
     }
 }
