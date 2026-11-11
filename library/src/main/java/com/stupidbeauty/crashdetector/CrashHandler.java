@@ -243,6 +243,7 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
         } catch (Exception e) {
             Log.e(TAG, "❌ 启动崩溃报告界面失败：" + e.getMessage(), e);
         }
+    }
     
     /**
      * 判断是否为系统噪音异常。
@@ -267,6 +268,5 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
             current = current.getCause();
         }
         return false;
-    }
     }
 }
