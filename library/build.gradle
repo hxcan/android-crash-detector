@@ -38,7 +38,7 @@ afterEvaluate {
                 from components.release
                 groupId = 'com.github.hxcan'
                 artifactId = 'android-crash-detector'
-                version = '2026.4.4'
+                version = '2026.11.11'
             }
         }
     }
