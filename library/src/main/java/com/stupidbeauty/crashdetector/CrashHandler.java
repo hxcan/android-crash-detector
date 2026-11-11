@@ -99,7 +99,15 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
         saveToExternalStorage(crashReport);
         
         // 3. 启动 CrashReportActivity 显示崩溃信息（独立进程）
-        showCrashReportUI(crashReport);
+        if (isSystemNoiseException(throwable))
+        {
+            // 系统噪音异常（DeadSystem 系列）：已记录日志，但不弹窗打扰用户
+            Log.w(TAG, "⚠️ 检测到系统噪音异常（DeadSystem），已记录日志但不弹窗报告");
+        }
+        else
+        {
+            showCrashReportUI(crashReport);
+        }
         
         // 交给默认处理器处理（显示系统崩溃对话框）
         if (defaultHandler != null) {
@@ -235,5 +243,30 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
         } catch (Exception e) {
             Log.e(TAG, "❌ 启动崩溃报告界面失败：" + e.getMessage(), e);
         }
+    
+    /**
+     * 判断是否为系统噪音异常。
+     *
+     * 这类异常由系统框架抛出（ActivityClient / ActivityThread），
+     * 宿主应用无法捕获或避免，但可以避免打扰用户：
+     * 仍然记录日志，但不弹出崩溃报告窗口。
+     *
+     * ⚠️ 必须沿 cause 链查找：实测存在顶层为 RuntimeException
+     * （Unable to create service）而 DeadSystem 藏在 cause 链第 2 层的情况。
+     * ⚠️ 必须用字符串比较类名：DeadSystemRuntimeException 是 Android 13 (API 33)
+     * 才引入的类，直接引用会导致低版本编译失败。
+     */
+    private static boolean isSystemNoiseException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if ("android.os.DeadSystemRuntimeException".equals(className)
+                    || "android.os.DeadSystemException".equals(className)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
     }
 }
